@@ -71,19 +71,6 @@ function buildNoteText(payload: LeadPayload): string {
   return linhas.join("\n");
 }
 
-// Mapeia faixa de investimento para valor numérico central (para coluna de orçamento)
-function investimentoToNumber(value: string): number | null {
-  const map: Record<string, number> = {
-    ate10:      5000,
-    "10a20":    15000,
-    "20a35":    27500,
-    "35a60":    47500,
-    acima60:    70000,
-    indefinido: 0,
-  };
-  return map[value] ?? null;
-}
-
 // ─── Mutation Monday.com (GraphQL) ────────────────────────────────────────────
 
 async function createMondayLead(payload: LeadPayload): Promise<{ id: string }> {
@@ -95,37 +82,15 @@ async function createMondayLead(payload: LeadPayload): Promise<{ id: string }> {
     throw new Error("Variáveis MONDAY_API_TOKEN e MONDAY_BOARD_ID não configuradas.");
   }
 
-  const itemName    = buildItemName(payload);
-  const noteText    = buildNoteText(payload);
-  const orcamento   = investimentoToNumber(payload.investimento);
-  const hoje        = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-
-  // Monta os valores das colunas.
-  // Os IDs abaixo são os padrões mais comuns — ajuste conforme os IDs reais do seu board.
-  // Para descobrir os IDs: monday.com → board → Integração → API → inspecionar colunas.
-  const columnValues: Record<string, unknown> = {
-    // Status principal
-    status: { label: "Em análise" },
-    // Data do primeiro contato
-    date4: { date: hoje },
-    // Localidade / cidade
-    location: { address: payload.cidade },
-    // Fase do pipeline
-    pipeline_stage: { label: "Diagnóstico e 1ª Visita" },
-  };
-
-  // Orçamento numérico (só adiciona se tiver valor)
-  if (orcamento) {
-    columnValues["numbers"] = orcamento;
-  }
+  const itemName = buildItemName(payload);
+  const noteText = buildNoteText(payload);
 
   const mutation = `
-    mutation CreateLead($boardId: ID!, $groupId: String, $itemName: String!, $columnValues: JSON!) {
+    mutation CreateLead($boardId: ID!, $groupId: String, $itemName: String!) {
       create_item(
         board_id: $boardId
         group_id: $groupId
         item_name: $itemName
-        column_values: $columnValues
       ) {
         id
       }
@@ -136,7 +101,6 @@ async function createMondayLead(payload: LeadPayload): Promise<{ id: string }> {
     boardId,
     groupId: groupId ?? null,
     itemName,
-    columnValues: JSON.stringify(columnValues),
   };
 
   const res = await fetch("https://api.monday.com/v2", {
