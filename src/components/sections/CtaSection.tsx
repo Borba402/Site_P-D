@@ -74,7 +74,7 @@ export function CtaSection() {
           }}
         >
           <Link
-            href="/contato"
+            href="/orcamento"
             id="cta-final-orcamento"
             aria-label="Solicitar orçamento personalizado"
             className="btn-cta-orcamento"

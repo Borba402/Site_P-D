@@ -82,7 +82,7 @@ export function Navbar() {
               ))}
               <li>
                 <Link
-                  href="/contato"
+                  href="/orcamento"
                   className="btn btn-outline"
                   id="navbar-cta"
                   aria-label="Solicitar orçamento"
@@ -199,7 +199,7 @@ export function Navbar() {
           </ul>
         </nav>
         <Link
-          href="/contato"
+          href="/orcamento"
           className="btn btn-outline"
           onClick={() => setMenuOpen(false)}
           style={{ fontSize: "0.7rem", marginTop: "1rem" }}
