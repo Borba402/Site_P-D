@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import Link from "next/link";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -128,6 +127,7 @@ export function OrcamentoWizard() {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
   const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
   const [answers, setAnswers] = useState<Answers>({
     projeto: "",
     ambientes: [],
@@ -140,12 +140,25 @@ export function OrcamentoWizard() {
   const currentStep = STEPS[step];
   const progress = ((step) / totalSteps) * 100;
 
-  function goNext() {
+  async function goNext() {
     setDir(1);
     if (step < totalSteps - 1) {
       setStep(s => s + 1);
     } else {
-      setDone(true);
+      // Último passo: envia para Monday de forma silenciosa antes de exibir tela final
+      setSending(true);
+      try {
+        await fetch("/api/lead", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(answers),
+        });
+      } catch {
+        // Erro de rede não bloqueia o cliente — ele ainda vai ao WhatsApp
+      } finally {
+        setSending(false);
+        setDone(true);
+      }
     }
   }
 
@@ -546,7 +559,7 @@ export function OrcamentoWizard() {
           <div style={{ marginTop: "2.5rem" }}>
             <button
               onClick={goNext}
-              disabled={!canAdvance()}
+              disabled={!canAdvance() || sending}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -556,25 +569,31 @@ export function OrcamentoWizard() {
                 fontWeight: 600,
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
-                backgroundColor: canAdvance() ? "var(--color-gold)" : "rgba(201,169,110,0.2)",
-                color: canAdvance() ? "var(--color-black)" : "rgba(201,169,110,0.4)",
+                backgroundColor: canAdvance() && !sending ? "var(--color-gold)" : "rgba(201,169,110,0.2)",
+                color: canAdvance() && !sending ? "var(--color-black)" : "rgba(201,169,110,0.4)",
                 border: "none",
                 padding: "1rem 2.25rem",
-                cursor: canAdvance() ? "pointer" : "not-allowed",
+                cursor: canAdvance() && !sending ? "pointer" : "not-allowed",
                 transition: "all 250ms ease",
               }}
               onMouseEnter={e => {
-                if (canAdvance()) e.currentTarget.style.backgroundColor = "var(--color-gold-light)";
+                if (canAdvance() && !sending) e.currentTarget.style.backgroundColor = "var(--color-gold-light)";
               }}
               onMouseLeave={e => {
-                if (canAdvance()) e.currentTarget.style.backgroundColor = "var(--color-gold)";
+                if (canAdvance() && !sending) e.currentTarget.style.backgroundColor = "var(--color-gold)";
               }}
             >
-              {step < totalSteps - 1 ? "Continuar" : "Ver resumo"}
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="2" y1="8" x2="14" y2="8" />
-                <polyline points="9 3 14 8 9 13" />
-              </svg>
+              {sending
+                ? "Registrando…"
+                : step < totalSteps - 1
+                  ? "Continuar"
+                  : "Ver resumo"}
+              {!sending && (
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="2" y1="8" x2="14" y2="8" />
+                  <polyline points="9 3 14 8 9 13" />
+                </svg>
+              )}
             </button>
           </div>
         </motion.div>
