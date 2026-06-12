@@ -83,7 +83,7 @@ export function CtaSection() {
           </Link>
 
           <a
-            href="https://wa.me/55"
+            href="https://wa.me/5511913550385"
             id="cta-final-whatsapp"
             target="_blank"
             rel="noopener noreferrer"
