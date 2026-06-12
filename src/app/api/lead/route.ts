@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -180,29 +181,61 @@ async function createMondayLead(payload: LeadPayload): Promise<{ id: string }> {
   return { id: itemId };
 }
 
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+
+async function saveToSupabase(payload: LeadPayload, mondayItemId: string | null) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.warn("[/api/lead] SUPABASE_URL ou SUPABASE_SERVICE_KEY não configurados.");
+    return;
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const { error } = await supabase.from("leads").insert({
+    projeto:        payload.projeto,
+    ambientes:      payload.ambientes,
+    cidade:         payload.cidade,
+    investimento:   payload.investimento,
+    prazo:          payload.prazo,
+    monday_item_id: mondayItemId,
+  });
+
+  if (error) {
+    console.error("[/api/lead] Supabase insert error:", error.message);
+  }
+}
+
 // ─── Handler da rota ──────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json() as LeadPayload;
 
-    // Validação mínima
     if (!payload.cidade || !payload.projeto || !payload.investimento || !payload.prazo) {
-      return NextResponse.json(
-        { error: "Dados incompletos." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Dados incompletos." }, { status: 400 });
     }
 
-    const result = await createMondayLead(payload);
+    // Executa Monday e Supabase em paralelo — falha de um não bloqueia o outro
+    const [mondayResult] = await Promise.allSettled([
+      createMondayLead(payload),
+    ]);
 
-    return NextResponse.json({ ok: true, monday_item_id: result.id });
+    const mondayItemId = mondayResult.status === "fulfilled" ? mondayResult.value.id : null;
+
+    if (mondayResult.status === "rejected") {
+      console.error("[/api/lead] Monday error:", mondayResult.reason);
+    }
+
+    // Salva no Supabase (com o ID do Monday se disponível)
+    await saveToSupabase(payload, mondayItemId);
+
+    return NextResponse.json({ ok: true, monday_item_id: mondayItemId });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
     console.error("[/api/lead]", message);
-
-    // Retorna 200 mesmo em erro para não bloquear o fluxo do cliente —
-    // ele ainda consegue ir ao WhatsApp. O erro fica apenas no log do servidor.
     return NextResponse.json({ ok: false, error: message }, { status: 200 });
   }
 }
